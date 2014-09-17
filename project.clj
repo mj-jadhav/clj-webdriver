@@ -1,4 +1,4 @@
-(defproject clj-webdriver "0.6.1"
+(defproject me.mj-jadhav/clj-webdriver "0.0.1-SNAPSHOT"
   :description "Clojure API for Selenium-WebDriver"
   :url "https://github.com/semperos/clj-webdriver"
   :license {:name "Eclipse Public License"
@@ -9,14 +9,14 @@
                  [org.clojure/tools.logging "0.2.3"]
                  ;; Exclude these, giving preference to Selenium-WebDriver's
                  ;; dependence on them.
-                 [clj-http "0.3.0" :exclusions [org.apache.httpcomponents/httpclient
+                 [clj-http "0.7.7" :exclusions [org.apache.httpcomponents/httpclient
                                                 org.apache.httpcomponents/httpcore
                                                 org.apache.httpcomponents/httpmime]]
                  [cheshire "2.1.0"]
                  [org.mortbay.jetty/jetty "6.1.25"]
-                 [org.seleniumhq.selenium/selenium-server "2.42.2"]
-                 [org.seleniumhq.selenium/selenium-java "2.42.2"]
-                 [org.seleniumhq.selenium/selenium-remote-driver "2.42.0"]
+                 [org.seleniumhq.selenium/selenium-server "2.43.1"]
+                 [org.seleniumhq.selenium/selenium-java "2.43.1"]
+                 [org.seleniumhq.selenium/selenium-remote-driver "2.43.1"]
                  [com.github.detro.ghostdriver/phantomjsdriver "1.0.4"
                   :exclusion [org.seleniumhq.selenium/selenium-java
                               org.seleniumhq.selenium/selenium-server
