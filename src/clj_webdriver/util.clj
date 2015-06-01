@@ -341,3 +341,44 @@
   ([] (throw-nse ""))
   ([msg]
      (throw (NoSuchElementException. (str msg "\n" "When an element cannot be found in clj-webdriver, nil is returned. You've just tried to perform an action on an element that returned as nil for the search query you used. Please verify the query used to locate this element; it is not on the current page.")))))
+
+(defmacro with-error-log
+  "If body execution throws any exception, then it will print given
+  action string and query element and returns exception stacktrace
+   Ex:
+   (let [el \".foo\"]
+      (with-error-log
+        \"click\"
+        el
+        (clj-webdriver.core/click el))
+  If click action fails for some reason, then it will return result as -
+  `click` call failed for element: \".foo\"
+   <followed by whole stacktrace>"
+  [action q & body]
+  `(try
+     (do ~@body)
+     (catch Exception e#
+       (let [error-log# (format "\n`%s` call failed for element: %s\n" ~action ~q)]
+         (log/error e# error-log#))
+       e#)))
+
+(defmacro with-wait-until-error-log
+  "If body execution throws any exception, then it will print error with
+  metadata of pred function if available and retruns exception stacktrace
+   Ex:
+   (let [pred ^{:function \"checks .foo existance\"} #(exists? \".foo\")]
+      (with-wait-until-error-log
+        pred
+        (clj-webdriver.wait/wait-until pred))
+  If wait-until action fails for some reason, then it will return result as -
+  `Wait-until` call failed for function with meta: {:function \"checks .foo existance\"}
+   <followed by whole stacktrace>"
+  [pred & body]
+  `(try
+     ~@body
+     (catch Exception e#
+       (let [error-log# (if-let [meta# (meta ~pred)]
+                          (format "\n`Wait-until` call failed for function with meta: %s\n" meta#)
+                          "\n`Wait-until` call failed (No function meta available to show details)")]
+         (log/error e# error-log#))
+       e#)))

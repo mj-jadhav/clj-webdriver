@@ -6,7 +6,8 @@
             [clj-webdriver.window :as win]
             [clj-webdriver.util :as util]
             [clj-webdriver.options :as options]
-            [clj-webdriver.wait :as wait])
+            [clj-webdriver.wait :as wait]
+            [clojure.tools.logging :as log])
   (:import clj_webdriver.element.Element))
 
 (declare css-finder)
@@ -555,7 +556,7 @@
    ;;
    ;; Full example
    ;;
-   (add-cookie {:name \"foo\", :value \"bar\", 
+   (add-cookie {:name \"foo\", :value \"bar\",
                 :domain \"example.com\", :path \"a-path\",
                 :expiry (java.util.Date.), :secure? false}) "
   ([cookie-spec] (add-cookie *driver* cookie-spec))
@@ -654,8 +655,9 @@
   ([driver js js-args]
      (apply (partial core/execute-script driver js) js-args)))
 
+
 (defn wait-until
-  "Make the browser wait until the predicate `pred` returns true, providing an optional `timeout` in milliseconds and an optional `interval` in milliseconds on which to attempt the predicate. If the timeout is exceeded, an exception is thrown.
+  "Make the browser wait until the predicate `pred` returns true, providing an optional `timeout` in milliseconds and an optional `interval` in milliseconds on which to attempt the predicate. If the timeout is exceeded, an exception is thrown. If function has associated meta data, then log will highlight exact failure pointing funcions metadata.
 
    The predicate is a function that accepts the browser `Driver` record as its single parameter, and should return a truthy/falsey value.
 
@@ -675,11 +677,34 @@
    ;;
    (... code to load page ...)
    (wait-until #(exists? \"#foo\"))
-   (click \"#foo a.bar\")"
-  ([pred] (wait/wait-until *driver* (fn [_] pred)))
-  ([pred timeout] (wait/wait-until *driver* (fn [_] pred) timeout))
-  ([pred timeout interval] (wait/wait-until *driver* (fn [_] pred) timeout interval))
-  ([driver pred timeout interval] (wait/wait-until driver (fn [d] (pred d)) timeout interval)))
+   (click \"#foo a.bar\")j
+
+   ;;
+   ;; Failure of wait-until where pred fn is associated with meta-data
+   ;;
+   (wait-until ^{:function \"Checking for existance of \"foo\" element}
+               #(exists? \"#foo\"))
+
+     Output:
+      Wait-until action fails for function with meta: {:function \"Checking for existance of \"foo\" element}
+      <full stack-trace of exception>"
+  ([pred]
+     (util/with-wait-until-error-log
+       pred
+       (wait/wait-until *driver* (fn [_] pred))))
+  ([pred timeout]
+     (util/with-wait-until-error-log
+       pred
+       (wait/wait-until *driver* (fn [_] pred) timeout)))
+  ([pred timeout interval]
+     (util/with-wait-until-error-log
+       pred
+       (wait/wait-until *driver* (fn [_] pred) timeout interval)))
+  ([driver pred timeout interval]
+     (util/with-wait-until-error-log
+       pred
+       (wait/wait-until driver (fn [d] (pred d)) timeout interval))))
+
 
 (defn implicit-wait
   "Set the global `timeout` that the browser should wait when attempting to find elements on the page, before timing out with an exception.
@@ -916,7 +941,11 @@
    (attribute \"a#foo\" :target) ;=> \"_blank\""
   ([q attr] (attribute *driver* q attr))
   ([driver q attr]
-     (core/attribute (element driver q) attr)))
+     (util/with-error-log
+       "attribute"
+       q
+       (core/attribute (element driver q) attr))))
+
 
 (defn click
   "Click the first element found with query `q`.
@@ -927,7 +956,11 @@
    (click \"a#foo\")"
   ([q] (click *driver* q))
   ([driver q]
-     (core/click (element driver q))))
+     (util/with-error-log
+       "click"
+       q
+       (core/click (element driver q)))))
+
 
 (defn displayed?
   "Return true if the first element found with query `q` is visible on the page.
@@ -939,7 +972,10 @@
    (displayed? \"a.hidden\")      ;=> false"
   ([q] (displayed? *driver* q))
   ([driver q]
-     (core/displayed? (element driver q))))
+     (util/with-error-log
+       "displayed?"
+       q
+       (core/displayed? (element driver q)))))
 
 (defn drag-and-drop
   "Drag the first element found with query `qa` onto the first element found with query `qb`.
@@ -953,7 +989,10 @@
    (drag-and-drop \"#draggable\" \"#droppable\")"
   ([qa qb] (drag-and-drop *driver* qa qb))
   ([driver qa qb]
-     (core/drag-and-drop driver (element driver qa) (element driver qb))))
+     (util/with-error-log
+       "drag-and-drop"
+       [qa qb]
+       (core/drag-and-drop driver (element driver qa) (element driver qb)))))
 
 (defn drag-and-drop-by
   "Drag the first element found with query `q` by `:x` pixels to the right and `:y` pixels down, passed in as a map like `{:x 10, :y 10}`. Values default to zero if excluded. Use negative numbers for `:x` and `:y` to move left or up respectively.
@@ -977,7 +1016,10 @@
    (drag-and-drop-by \"#draggable\" {:x -15, :y -5})"
   ([q x-y-map] (drag-and-drop-by *driver* q x-y-map))
   ([driver q x-y-map]
-     (core/drag-and-drop-by driver (element driver q) x-y-map)))
+     (util/with-error-log
+       "drag-and-drop-by"
+       [q x-y-map]
+       (core/drag-and-drop-by driver (element driver q) x-y-map))))
 
 (defn exists?
   "Return true if the first element found with query `q` exists on the current page in the browser.
@@ -1000,7 +1042,10 @@
    (flash \"a.hard-to-see\")"
   ([q] (flash *driver* q))
   ([driver q]
-     (core/flash (element driver q))))
+     (util/with-error-log
+       "flash"
+       q
+       (core/flash (element driver q)))))
 
 (defn focus
   "Explicitly give the first element found with query `q` focus on the page.
@@ -1011,7 +1056,10 @@
    (focus \"input.next-element\")"
   ([q] (focus *driver* q))
   ([driver q]
-     (core/focus (element driver q))))
+     (util/with-error-log
+       "focus"
+       q
+       (core/focus (element driver q)))))
 
 (defn html
   "Return the inner html of the first element found with query `q`.
@@ -1022,7 +1070,10 @@
    (html \"div.with-interesting-html\")"
   ([q] (html *driver* q))
   ([driver q]
-     (core/html (element driver q))))
+     (util/with-error-log
+       "html"
+       q
+       (core/html (element driver q)))))
 
 (defn location
   "Return a map of `:x` and `:y` coordinates for the first element found with query `q`.
@@ -1033,7 +1084,10 @@
    (location \"a#foo\") ;=> {:x 240, :y 300}"
   ([q] (location *driver* q))
   ([driver q]
-     (core/location (element driver q))))
+     (util/with-error-log
+       "location"
+       q
+       (core/location (element driver q)))))
 
 (defn location-once-visible
   "Return a map of `:x` and `:y` coordinates for the first element found with query `q` once the page has been scrolled enough to be visible in the viewport.
@@ -1044,7 +1098,10 @@
    (location-once-visible \"a#foo\") ;=> {:x 240, :y 300}"
   ([q] (location-once-visible *driver* q))
   ([driver q]
-     (core/location-once-visible (element driver q))))
+     (util/with-error-log
+       "location-once-visible"
+       q
+       (core/location-once-visible (element driver q)))))
 
 (defn present?
   "Return true if the first element found with query `q` both exists and is visible on the page.
@@ -1067,7 +1124,10 @@
    (size \"div#container\") ;=> {:width 960, :height 2000} "
   ([q] (element-size *driver* q))
   ([driver q]
-     (core/size (element driver q))))
+     (util/with-error-log
+       "element-size"
+       q
+       (core/size (element driver q)))))
 
 (defn intersects?
   "Return true if the first element found with query `qa` intersects with the first element found with query `qb`.
@@ -1090,7 +1150,10 @@
    (tag \"#foo\") ;=> \"a\""
   ([q] (tag *driver* q))
   ([driver q]
-     (core/tag (element driver q))))
+     (util/with-error-log
+       "tag"
+       q
+       (core/tag (element driver q)))))
 
 (defn text
   "Return the text within the first element found with query `q`.
@@ -1101,7 +1164,10 @@
    (text \"#message\") ;=> \"An error occurred.\""
   ([q] (text *driver* q))
   ([driver q]
-     (core/text (element driver q))))
+     (util/with-error-log
+       "text"
+       q
+       (core/text (element driver q)))))
 
 (defn value
   "Return the value of the HTML value attribute for the first element found with query `q`. The is identical to `(attribute q :value)`
@@ -1112,7 +1178,10 @@
    (value \"#my-button\") ;=> \"submit\" "
   ([q] (value *driver* q))
   ([driver q]
-     (core/value (element driver q))))
+     (util/with-error-log
+       "text"
+       q
+       (core/value (element driver q)))))
 
 (defn visible?
   "Return true if the first element found with query `q` is visible on the current page in the browser.
@@ -1124,7 +1193,10 @@
    (visible? \"a.hidden\")      ;=> false"
   ([q] (visible? *driver* q))
   ([driver q]
-     (core/visible? (element driver q))))
+     (util/with-error-log
+       "visible?"
+       q
+       (core/visible? (element driver q)))))
 
 (defn xpath
   "Return an absolute XPath path for the first element found with query `q`. NOTE: This function relies on executing JavaScript in the browser, and is therefore not as dependable as other functions.
@@ -1135,7 +1207,10 @@
    (xpath \"#login_field\") ;=> \"/html/body/div[2]/div/div/form/div[2]/label/input\""
   ([q] (xpath *driver* q))
   ([driver q]
-     (core/xpath (element driver q))))
+     (util/with-error-log
+       "xpath"
+       q
+       (core/xpath (element driver q)))))
 
 (defn deselect
   "If the first form element found with query `q` is selected, click the element to deselect it. Otherwise, do nothing and just return the element found.
@@ -1147,7 +1222,10 @@
    (deselect \"input.not-selected\")     ;=> do nothing"
   ([q] (deselect *driver* q))
   ([driver q]
-     (core/deselect (element driver q))))
+     (util/with-error-log
+       "deselect"
+       q
+       (core/deselect (element driver q)))))
 
 (defn enabled?
   "Return true if the first form element found with query `q` is enabled (not disabled).
@@ -1158,7 +1236,11 @@
    (enabled? \"input\")                      ;=> true
    (enabled? \"input[disabled='disabled']\") ;=> false"
   ([q] (enabled? *driver* q))
-  ([driver q] (core/enabled? (element driver q))))
+  ([driver q]
+     (util/with-error-log
+       "enabled?"
+       q
+       (core/enabled? (element driver q)))))
 
 (defn input-text
   "Type the string `s` into the first form element found with query `q`.
@@ -1169,7 +1251,10 @@
    (input-text \"input#login_field\" \"semperos\")"
   ([q s] (input-text *driver* q s))
   ([driver q s]
-     (core/input-text (element driver q) s)))
+     (util/with-error-log
+       "input-text"
+       q
+       (core/input-text (element driver q) s))))
 
 (defn submit
   "Submit the form that the first form element found with query `q` belongs to (this is equivalent to pressing ENTER in a text field while filling out a form).
@@ -1180,7 +1265,10 @@
    (submit \"input#password\")"
   ([q] (submit *driver* q))
   ([driver q]
-     (core/submit (element driver q))))
+     (util/with-error-log
+       "submit"
+       q
+       (core/submit (element driver q)))))
 
 (defn clear
   "Clear the contents (the HTML value attribute) of the first form element found with query `q`.
@@ -1191,7 +1279,10 @@
    (clear \"input.with-default-text\")"
   ([q] (clear *driver* q))
   ([driver q]
-     (core/clear (element driver q))))
+     (util/with-error-log
+       "clear"
+       q
+       (core/clear (element driver q)))))
 
 (defn select
   "If the first form element found with query `q` is not selected, click the element to select it. Otherwise, do nothing and just return the element found.
@@ -1203,7 +1294,10 @@
    (select \"input.not-selected\")     ;=> click"
   ([q] (select *driver* q))
   ([driver q]
-     (core/select (element driver q))))
+     (util/with-error-log
+       "select"
+       q
+       (core/select (element driver q)))))
 
 (defn selected?
   "Return true if the first element found with the query `q` is selected (works for radio buttons, checkboxes, and option tags within select lists).
@@ -1214,7 +1308,11 @@
    (selected? \"input[type='radio'][value='foo']\") ;=> true
    (selected? \"option[value='foo']\")              ;=> false "
   ([q] (selected? *driver* q))
-  ([driver q] (core/selected? (element driver q))))
+  ([driver q]
+     (util/with-error-log
+       "selected?"
+       q
+       (core/selected? (element driver q)))))
 
 (defn send-keys
   "Type the string `s` into the first form element found with query `q`.
@@ -1225,7 +1323,10 @@
    (input-text \"input#login_field\" \"semperos\")"
   ([q s] (send-keys *driver* q s))
   ([driver q s]
-     (core/send-keys (element driver q) s)))
+     (util/with-error-log
+       "send-keys"
+       q
+       (core/send-keys (element driver q) s))))
 
 (defn toggle
   "Toggle is a synonym for click. Click the first element found with query `q`.
@@ -1236,7 +1337,10 @@
    (toggle \"input[type='checkbox'][value='foo']\")"
   ([q] (toggle *driver* q))
   ([driver q]
-     (core/toggle (element driver q))))
+     (util/with-error-log
+       "toggle"
+       q
+       (core/toggle (element driver q)))))
 
 (defn options
   "Return all option elements within the first select list found with query `q`.
@@ -1247,7 +1351,10 @@
    (options \"#my-select-list\")"
   ([q] (options *driver* q))
   ([driver q]
-     (core/all-options (element driver q))))
+     (util/with-error-log
+       "options"
+       q
+       (core/all-options (element driver q)))))
 
 (defn selected-options
   "Return all selected option elements within the first select list found with query `q`.
@@ -1258,10 +1365,13 @@
    (selected-options \"#my-select-list\")"
   ([q] (selected-options *driver* q))
   ([driver q]
-     (core/all-selected-options (element driver q))))
+     (util/with-error-log
+       "selected-options"
+       q
+       (core/all-selected-options (element driver q)))))
 
 (defn deselect-option
-  "Deselect the option element matching `attr-val` within the first select list found with query `q`. 
+  "Deselect the option element matching `attr-val` within the first select list found with query `q`.
 
    The `attr-val` can contain `:index`, `:value`, or `:text` keys to find the target option element. Index is the zero-based order of the option element in the list, value is the value of the HTML value attribute, and text is the visible text of the option element on the page.
 
@@ -1284,7 +1394,10 @@
    (deselect-option \"#my-select-list\" {:value \"Foo\"})"
   ([q attr-val] (deselect-option *driver* q attr-val))
   ([driver q attr-val]
-     (core/deselect-option (element driver q) attr-val)))
+     (util/with-error-log
+       "deselect-option"
+       [q attr-val]
+       (core/deselect-option (element driver q) attr-val))))
 
 (defn deselect-all
   "Deselect all options within the first select list found with query `q`.
@@ -1294,7 +1407,11 @@
 
    (deselect-all \"#my-select-list\")"
   ([q] (deselect-all *driver* q))
-  ([driver q] (core/deselect-all (element driver q))))
+  ([driver q]
+     (util/with-error-log
+       "deselect-all"
+       q
+       (core/deselect-all (element driver q)))))
 
 (defn deselect-by-index
   "Deselect the option element at index `idx` (zero-based) within the first select list found with query `q`.
@@ -1307,7 +1424,11 @@
    ;;
    (deselect-by-index \"#my-select-list\" 1)"
   ([q idx] (deselect-by-index *driver* q idx))
-  ([driver q idx] (core/deselect-by-index (element driver q) idx)))
+  ([driver q idx]
+     (util/with-error-log
+       "deselect-by-index"
+       [q idx]
+       (core/deselect-by-index (element driver q) idx))))
 
 (defn deselect-by-text
   "Deselect the option element with visible text `text` within the first select list found with query `q`.
@@ -1318,7 +1439,10 @@
    (deselect-by-text \"#my-select-list\" \"Foo\")"
   ([q text] (deselect-by-text *driver* q text))
   ([driver q text]
-     (core/deselect-by-text (element driver q) text)))
+     (util/with-error-log
+       "deselect-by-text"
+       [q text]
+       (core/deselect-by-text (element driver q) text))))
 
 (defn deselect-by-value
   "Deselect the option element with `value` within the first select list found with query `q`.
@@ -1329,7 +1453,10 @@
    (deselect-by-value \"#my-select-list\" \"foo\")"
   ([q value] (deselect-by-value *driver* q value))
   ([driver q value]
-     (core/deselect-by-value (element driver q) value)))
+     (util/with-error-log
+       "deselect-by-value"
+       [q value]
+       (core/deselect-by-value (element driver q) value))))
 
 (defn multiple?
   "Return true if the first select list found with query `q` allows multiple selections.
@@ -1340,10 +1467,14 @@
    (multiple? \"select.multiple\")     ;=> true
    (multiple? \"select.not-multiple\") ;=> false "
   ([q] (multiple? *driver* q))
-  ([driver q] (core/multiple? (element driver q))))
+  ([driver q]
+     (util/with-error-log
+       "multiple?"
+       q
+       (core/multiple? (element driver q)))))
 
 (defn select-option
-  "Select the option element matching `attr-val` within the first select list found with query `q`. 
+  "Select the option element matching `attr-val` within the first select list found with query `q`.
 
    The `attr-val` can contain `:index`, `:value`, or `:text` keys to find the target option element. Index is the zero-based order of the option element in the list, value is the value of the HTML value attribute, and text is the visible text of the option element on the page.
 
@@ -1366,7 +1497,10 @@
    (select-option \"#my-select-list\" {:value \"Foo\"})"
   ([q attr-val] (select-option *driver* q attr-val))
   ([driver q attr-val]
-     (core/select-option (element driver q) attr-val)))
+     (util/with-error-log
+       "select-option"
+       [q attr-val]
+       (core/select-option (element driver q) attr-val))))
 
 (defn select-all
   "Select all options within the first select list found with query `q`.
@@ -1377,7 +1511,10 @@
    (deselect-all \"#my-select-list\")"
   ([q] (select-all *driver* q))
   ([driver q]
-     (core/select-all (element driver q))))
+     (util/with-error-log
+       "select-all"
+       q
+       (core/select-all (element driver q)))))
 
 (defn select-by-index
   "Select the option element at index `idx` (zero-based) within the first select list found with query `q`.
@@ -1391,7 +1528,10 @@
    (select-by-index \"#my-select-list\" 1)"
   ([q idx] (select-by-index *driver* q idx))
   ([driver q idx]
-     (core/select-by-index (element driver q) idx)))
+     (util/with-error-log
+       "select-by-index"
+       [q idx]
+       (core/select-by-index (element driver q) idx))))
 
 (defn select-by-text
   "Select the option element with visible text `text` within the first select list found with query `q`.
@@ -1402,7 +1542,10 @@
    (select-by-text \"#my-select-list\" \"foo\")"
   ([q text] (select-by-text *driver* q text))
   ([driver q text]
-     (core/select-by-text (element driver q) text)))
+     (util/with-error-log
+       "select-by-text"
+       [q text]
+       (core/select-by-text (element driver q) text))))
 
 (defn select-by-value
   "Select the option element with `value` within the first select list found with query `q`.
@@ -1413,7 +1556,10 @@
    (select-by-value \"#my-select-list\" \"foo\")"
   ([q value] (select-by-value *driver* q value))
   ([driver q value]
-     (core/select-by-value (element driver q) value)))
+     (util/with-error-log
+       "select-by-value"
+       [q value]
+       (core/select-by-value (element driver q) value))))
 
 ;; Helpers
 (defn- quick-fill*
