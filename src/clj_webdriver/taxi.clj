@@ -6,8 +6,7 @@
             [clj-webdriver.window :as win]
             [clj-webdriver.util :as util]
             [clj-webdriver.options :as options]
-            [clj-webdriver.wait :as wait]
-            [clojure.tools.logging :as log])
+            [clj-webdriver.wait :as wait])
   (:import clj_webdriver.element.Element))
 
 (declare css-finder)

@@ -5,7 +5,7 @@
             [clj-webdriver.cache :as cache]
             clj-webdriver.driver)
   (:import clj_webdriver.driver.Driver
-           [org.openqa.selenium WebDriver WebElement NoSuchElementException]
+           [org.openqa.selenium WebDriver WebElement NoSuchElementException TimeoutException]
            [java.io PushbackReader Writer]))
 
 (declare build-query)
@@ -358,9 +358,8 @@
   `(try
      (do ~@body)
      (catch Exception e#
-       (let [error-log# (format "\n`%s` call failed for element: %s\n" ~action ~q)]
-         (log/error e# error-log#))
-       e#)))
+       (let [error-log# (format "\n\n`%s` call failed for element: %s\n" ~action ~q)]
+         (throw (NoSuchElementException. error-log#))))))
 
 (defmacro with-wait-until-error-log
   "If body execution throws any exception, then it will print error with
@@ -378,7 +377,6 @@
      ~@body
      (catch Exception e#
        (let [error-log# (if-let [meta# (meta ~pred)]
-                          (format "\n`Wait-until` call failed for function with meta: %s\n" meta#)
-                          "\n`Wait-until` call failed (No function meta available to show details)")]
-         (log/error e# error-log#))
-       e#)))
+                          (format "\n\n`Wait-until` call failed for function with meta: %s\n" meta#)
+                          "\n\n`Wait-until` call failed (No function meta available to show details)\n")]
+         (throw (TimeoutException. error-log#))))))
